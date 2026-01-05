@@ -9,6 +9,9 @@ import System.Random(mkStdGen, randoms)
 prepare :: Integer -> StateT
 prepare n = prepareState (n-1) (ket [0])
 
+prepareRFS :: Integer -> StateT
+prepareRFS n = prepareState (n-1) (ket [0] ⊗ ket[0])
+
 prepareState :: Integer -> StateT -> StateT
 prepareState 0 s = s ⊗ ket [1]
 prepareState n s = prepareState (n-1) (s ⊗ ket [0])
@@ -80,7 +83,7 @@ rcf_oracle_helper l n i s = oracle n (s !! fromIntegral i) >: rcf_oracle_helper 
 rcf_oracle_helper 1 n i s = oracle n (s !! fromIntegral i)
 
 path_circuit  :: Integer -> Integer -> QOp
-path_circuit n l = xI_n 3 (n+2) >: cI_n [0] 1 0 n >: xI_n 3 (n+2) >: cI_n [0] 1 0 n
+path_circuit n l = xI_n 3 (n+2) >: cI_n [1] 1 0 n >: xI_n 3 (n+2) >: cI_n [0] 1 0 n
 --path_circuit n l = cI_n [0] 1 0 n
 
 unitary_g :: [Integer] -> Integer -> QOp
@@ -95,7 +98,7 @@ xI_n i 1 = if (i == 1) then X else I ⊗ I
 xI_n i n = if (i == n) then X ⊗ xI_n i (n-1) else I ⊗ xI_n i (n-1)
 
 cI_n :: [Integer] -> Integer -> Integer -> Integer -> QOp
-cI_n s l i 1 = if(elem i s) then C (bv_oracle 1 [1]) else I ⊗ bv_oracle 1 [1]
+cI_n s l i 1 = if(elem i s) then C (bv_oracle 1 [0]) else I ⊗ bv_oracle 1 [0]
 cI_n s l i n = if(elem i s) then C (cI_n s l (i+1) (n-1)) else I ⊗ cI_n s l (i+1) (n-1)
 
 -- FUcntion to pass all possible paths as integer list to be given to the path circuit
@@ -122,18 +125,20 @@ main =  do
     let l = 2
     let state = prepare n
     let s = [[1,1]]  -- marked states
+    let staterfs = prepareRFS n
     let u_f = path_circuit 1 1
     let u_g = unitary_g [1] 2   
     let h = h_n 4
-    let h1 = opI_n 4 4 H
-    let hn = opI_n 1 4 H
-    let circuit_fk = [Unitary $ h, Unitary $ u_f, Unitary $ h1, Unitary $ u_g, Unitary $ h1 , Unitary $ u_f , Unitary $ h1 , Unitary $ hn]
+    let h1 = opI_n 3 4 H
+    let hn = opI_n 2 4 H
+    let hy = opI_n 1 4 H
+    let circuit_fk = [Unitary $ h, Unitary $ u_f, Unitary $ h1, Unitary $ u_g, Unitary $ h1 , Unitary $ u_f , Unitary $ h1 , Unitary $ hn, Unitary $ hy, Measure[0,1,2,3]]
     --let circuit_fk = [Unitary $ unitary_g [1] 2]
     --let circuit1 = circuit n (oracle n s)
-    --let (end_state, _) = evalProg circuit1 state rng0
+    let (end_state, _) = evalProg circuit_fk staterfs rng0
     putStr $ "Initial state:\n" ++ (showState state) ++ "\n\n"
     putStr $ "\nCircuit:\n" ++ showProgram circuit_fk ++ "\n\n"
-    --putStr $ "Final state:\n" ++ (showState end_state) ++ "\n\n"
+    putStr $ "Final state:\n" ++ (showState end_state) ++ "\n\n"
     --putStr $ "H_n" showState (hadamard_n n <> state) ++ "\n\n"
 
 
